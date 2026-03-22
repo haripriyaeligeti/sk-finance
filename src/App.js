@@ -5,7 +5,6 @@ import Groups from "./components/Groups";
 import PaymentsTable from "./components/PaymentsTable";
 import PeopleTable from "./components/PeopleTable";
 import ReleasesTable from "./components/ReleasesTable";
-import StatementArchive from "./components/StatementArchive";
 import StatementBuilder from "./components/StatementBuilder";
 
 function App() {
@@ -35,7 +34,6 @@ function App() {
           <PaymentsTable />
           <ReleasesTable />
           <StatementBuilder />
-          <StatementArchive />
         </div>
       </main>
     </div>
