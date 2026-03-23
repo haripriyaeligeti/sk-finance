@@ -16,6 +16,8 @@ const GroupMembersTable = () => {
   const [groupId, setGroupId] = useState("");
   const [personId, setPersonId] = useState("");
   const [shareCount, setShareCount] = useState("1");
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState("");
+  const [selectedCustomerFilter, setSelectedCustomerFilter] = useState("");
 
   const fetchGroupMembers = async () => {
     const [membershipSnapshot, groupsSnapshot, peopleSnapshot] =
@@ -86,6 +88,17 @@ const GroupMembersTable = () => {
     fetchGroupMembers();
   }, []);
 
+  const visibleGroupMembers = groupMembers.filter((member) => {
+    const matchesGroup = selectedGroupFilter
+      ? member.groupId === selectedGroupFilter
+      : true;
+    const matchesCustomer = selectedCustomerFilter
+      ? member.personId === selectedCustomerFilter
+      : true;
+
+    return matchesGroup && matchesCustomer;
+  });
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -148,8 +161,46 @@ const GroupMembersTable = () => {
         <table>
           <thead>
             <tr>
-              <th>Group</th>
-              <th>Customer</th>
+              <th>
+                <div className="table-header-filter">
+                  <span>Group</span>
+                  <select
+                    className="table-header-select"
+                    value={selectedGroupFilter}
+                    onChange={(event) =>
+                      setSelectedGroupFilter(event.target.value)
+                    }
+                  >
+                    <option value="">All groups</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.groupName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </th>
+              <th>
+                <div className="table-header-filter">
+                  <span>Customer</span>
+                  <select
+                    className="table-header-select"
+                    value={selectedCustomerFilter}
+                    onChange={(event) =>
+                      setSelectedCustomerFilter(event.target.value)
+                    }
+                  >
+                    <option value="">All customers</option>
+                    {people.map((person) => (
+                      <option key={person.id} value={person.id}>
+                        {[person.firstName, person.lastName]
+                          .filter(Boolean)
+                          .join(" ")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </th>
               <th>Shares</th>
               <th>Monthly Contribution</th>
               <th>Joined</th>
@@ -157,7 +208,7 @@ const GroupMembersTable = () => {
             </tr>
           </thead>
           <tbody>
-            {groupMembers.map((member) => (
+            {visibleGroupMembers.map((member) => (
               <tr key={member.id}>
                 <td>{member.groupName || member.groupId}</td>
                 <td>{member.memberName || member.personId}</td>
@@ -182,6 +233,13 @@ const GroupMembersTable = () => {
                 </td>
               </tr>
             ))}
+            {!visibleGroupMembers.length ? (
+              <tr>
+                <td colSpan="6">
+                  No group members found for the selected filter.
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>

@@ -6,15 +6,24 @@ import {
   deleteDoc,
   doc,
   Timestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
 const PeopleTable = () => {
   const [people, setPeople] = useState([]);
+  const [editingPersonId, setEditingPersonId] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+
+  const normalizeName = (value) =>
+    value.trim().replace(/\s+/g, " ").toLowerCase();
+
+  const resetForm = () => {
+    setEditingPersonId("");
+    setFirstName("");
+    setLastName("");
+  };
 
   const fetchPeople = async () => {
     const snapshot = await getDocs(collection(db, "people"));
@@ -24,27 +33,77 @@ const PeopleTable = () => {
   };
 
   const addPerson = async () => {
-    if (!firstName.trim() || !phone.trim()) {
-      alert("Enter at least first name and phone number.");
+    if (!firstName.trim() || !lastName.trim()) {
+      alert("Enter first name and last name.");
+      return;
+    }
+
+    const fullName = normalizeName(
+      [firstName, lastName].filter(Boolean).join(" "),
+    );
+    const duplicatePerson = people.find((person) => {
+      const existingName = normalizeName(
+        [person.firstName, person.lastName].filter(Boolean).join(" "),
+      );
+      return existingName === fullName;
+    });
+
+    if (duplicatePerson) {
+      alert("Customer name already exists.");
       return;
     }
 
     await addDoc(collection(db, "people"), {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      phone: phone.trim(),
-      address: address.trim(),
       createdAt: Timestamp.now(),
     });
-    setFirstName("");
-    setLastName("");
-    setPhone("");
-    setAddress("");
+
+    resetForm();
+    fetchPeople();
+  };
+
+  const startEditingPerson = (person) => {
+    setEditingPersonId(person.id);
+    setFirstName(person.firstName || "");
+    setLastName(person.lastName || "");
+  };
+
+  const updatePerson = async () => {
+    if (!editingPersonId || !firstName.trim() || !lastName.trim()) {
+      alert("Enter first name and last name.");
+      return;
+    }
+
+    const fullName = normalizeName(
+      [firstName, lastName].filter(Boolean).join(" "),
+    );
+    const duplicatePerson = people.find((person) => {
+      const existingName = normalizeName(
+        [person.firstName, person.lastName].filter(Boolean).join(" "),
+      );
+      return existingName === fullName && person.id !== editingPersonId;
+    });
+
+    if (duplicatePerson) {
+      alert("Customer name already exists.");
+      return;
+    }
+
+    await updateDoc(doc(db, "people", editingPersonId), {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+    });
+
+    resetForm();
     fetchPeople();
   };
 
   const deletePerson = async (id) => {
     await deleteDoc(doc(db, "people", id));
+    if (editingPersonId === id) {
+      resetForm();
+    }
     fetchPeople();
   };
 
@@ -60,7 +119,7 @@ const PeopleTable = () => {
           <h2>Customers</h2>
         </div>
         <p className="section-note">
-          Maintain customer contact details once and reuse them across groups.
+          Maintain customer names once and reuse them across groups.
         </p>
       </div>
 
@@ -81,28 +140,20 @@ const PeopleTable = () => {
             onChange={(event) => setLastName(event.target.value)}
           />
         </label>
-        <label>
-          Phone
-          <input
-            placeholder="9876543210"
-            value={phone}
-            onChange={(event) => setPhone(event.target.value)}
-          />
-        </label>
-        <label className="full-width">
-          Address
-          <input
-            placeholder="Town, area, landmark"
-            value={address}
-            onChange={(event) => setAddress(event.target.value)}
-          />
-        </label>
       </div>
 
       <div className="action-row">
-        <button className="primary-button" onClick={addPerson}>
-          Add customer
+        <button
+          className="primary-button"
+          onClick={editingPersonId ? updatePerson : addPerson}
+        >
+          {editingPersonId ? "Update customer" : "Add customer"}
         </button>
+        {editingPersonId ? (
+          <button className="ghost-button" onClick={resetForm}>
+            Cancel
+          </button>
+        ) : null}
       </div>
 
       <div className="table-wrap">
@@ -110,8 +161,6 @@ const PeopleTable = () => {
           <thead>
             <tr>
               <th>Name</th>
-              <th>Phone</th>
-              <th>Address</th>
               <th>Created</th>
               <th>Action</th>
             </tr>
@@ -120,12 +169,15 @@ const PeopleTable = () => {
             {people.map((person) => (
               <tr key={person.id}>
                 <td>
-                  {[person.firstName, person.lastName]
-                    .filter(Boolean)
-                    .join(" ")}
+                  <button
+                    className="name-button"
+                    onClick={() => startEditingPerson(person)}
+                  >
+                    {[person.firstName, person.lastName]
+                      .filter(Boolean)
+                      .join(" ")}
+                  </button>
                 </td>
-                <td>{person.phone || "-"}</td>
-                <td>{person.address || "-"}</td>
                 <td>
                   {person.createdAt
                     ? person.createdAt.toDate().toLocaleDateString()

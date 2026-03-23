@@ -357,6 +357,20 @@
   background: #ecd7c6;
 }
 
+.name-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: #8c3f2c;
+  cursor: pointer;
+}
+
+.name-button:hover {
+  color: #6b392b;
+  text-decoration: underline;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -412,6 +426,42 @@ thead th {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #735c51;
+}
+
+.table-header-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.table-header-select {
+  min-width: 180px;
+  border: 1px solid #dbc8bc;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #20150f;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.table-header-input {
+  min-width: 180px;
+  border: 1px solid #dbc8bc;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #20150f;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.table-header-input:focus,
+.table-header-select:focus {
+  outline: 2px solid rgba(140, 63, 44, 0.18);
+  border-color: #8c3f2c;
 }
 
 .status-pill {
