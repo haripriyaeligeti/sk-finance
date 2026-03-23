@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { db } from "../firebase";
@@ -10,51 +17,60 @@ const currencyFormatter = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 0,
 });
 
-const StatementBuilder = () => {
+const MonthlyCollectionStatementBuilder = () => {
   const [groups, setGroups] = useState([]);
   const [memberships, setMemberships] = useState([]);
   const [payments, setPayments] = useState([]);
   const [releases, setReleases] = useState([]);
   const [groupId, setGroupId] = useState("");
   const [cycleMonth, setCycleMonth] = useState("");
+  const [editingRowId, setEditingRowId] = useState("");
+  const [paymentForm, setPaymentForm] = useState({
+    amount: "",
+    paidOn: "",
+    paymentMode: "Cash",
+    status: "Pending",
+    notes: "",
+  });
+  const [savingRowId, setSavingRowId] = useState("");
+
+  const fetchStatementData = async () => {
+    const [
+      groupsSnapshot,
+      membershipsSnapshot,
+      paymentsSnapshot,
+      releasesSnapshot,
+    ] = await Promise.all([
+      getDocs(collection(db, "groups")),
+      getDocs(collection(db, "groupMembers")),
+      getDocs(collection(db, "payments")),
+      getDocs(collection(db, "releases")),
+    ]);
+
+    setGroups(
+      groupsSnapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })),
+    );
+    setMemberships(
+      membershipsSnapshot.docs.map((entry) => ({
+        id: entry.id,
+        ...entry.data(),
+      })),
+    );
+    setPayments(
+      paymentsSnapshot.docs.map((entry) => ({
+        id: entry.id,
+        ...entry.data(),
+      })),
+    );
+    setReleases(
+      releasesSnapshot.docs.map((entry) => ({
+        id: entry.id,
+        ...entry.data(),
+      })),
+    );
+  };
 
   useEffect(() => {
-    const fetchStatementData = async () => {
-      const [
-        groupsSnapshot,
-        membershipsSnapshot,
-        paymentsSnapshot,
-        releasesSnapshot,
-      ] = await Promise.all([
-        getDocs(collection(db, "groups")),
-        getDocs(collection(db, "groupMembers")),
-        getDocs(collection(db, "payments")),
-        getDocs(collection(db, "releases")),
-      ]);
-
-      setGroups(
-        groupsSnapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })),
-      );
-      setMemberships(
-        membershipsSnapshot.docs.map((entry) => ({
-          id: entry.id,
-          ...entry.data(),
-        })),
-      );
-      setPayments(
-        paymentsSnapshot.docs.map((entry) => ({
-          id: entry.id,
-          ...entry.data(),
-        })),
-      );
-      setReleases(
-        releasesSnapshot.docs.map((entry) => ({
-          id: entry.id,
-          ...entry.data(),
-        })),
-      );
-    };
-
     fetchStatementData();
   }, []);
 
@@ -87,15 +103,18 @@ const StatementBuilder = () => {
       const paidAmount = Number(payment?.amount || 0);
 
       return {
+        groupMemberId: membership.id,
+        personId: membership.personId,
         memberName: membership.memberName || membership.personId,
         shareCount: Number(membership.shareCount || 1),
         expectedAmount,
         paidAmount,
         balanceAmount: Math.max(expectedAmount - paidAmount, 0),
+        paymentId: payment?.id || "",
         paymentStatus: payment?.status || "Pending",
-        paidOn: payment?.paidOn || "-",
-        paymentMode: payment?.paymentMode || "-",
-        notes: payment?.notes || "-",
+        paidOn: payment?.paidOn || "",
+        paymentMode: payment?.paymentMode || "Cash",
+        notes: payment?.notes || "",
       };
     });
 
@@ -130,6 +149,69 @@ const StatementBuilder = () => {
       potValue,
     };
   }, [cycleMonth, groupId, memberships, payments, releases, selectedGroup]);
+
+  const startEditingRow = (row) => {
+    setEditingRowId(row.groupMemberId);
+    setPaymentForm({
+      amount: String(row.paidAmount || row.expectedAmount || ""),
+      paidOn: row.paidOn || "",
+      paymentMode: row.paymentMode || "Cash",
+      status: row.paymentStatus || "Pending",
+      notes: row.notes || "",
+    });
+  };
+
+  const cancelEditingRow = () => {
+    setEditingRowId("");
+    setPaymentForm({
+      amount: "",
+      paidOn: "",
+      paymentMode: "Cash",
+      status: "Pending",
+      notes: "",
+    });
+  };
+
+  const savePaymentRow = async (row) => {
+    if (!selectedGroup || !cycleMonth) {
+      alert("Select a group and cycle month first.");
+      return;
+    }
+
+    const resolvedAmount = Number(paymentForm.amount || 0);
+
+    setSavingRowId(row.groupMemberId);
+
+    try {
+      const paymentPayload = {
+        groupId,
+        groupName: selectedGroup.groupName,
+        groupMemberId: row.groupMemberId,
+        personId: row.personId,
+        memberName: row.memberName,
+        cycleMonth,
+        amount: resolvedAmount,
+        paidOn: paymentForm.paidOn,
+        paymentMode: paymentForm.paymentMode,
+        status: paymentForm.status,
+        notes: paymentForm.notes.trim(),
+      };
+
+      if (row.paymentId) {
+        await updateDoc(doc(db, "payments", row.paymentId), paymentPayload);
+      } else {
+        await addDoc(collection(db, "payments"), {
+          ...paymentPayload,
+          createdAt: Timestamp.now(),
+        });
+      }
+
+      await fetchStatementData();
+      cancelEditingRow();
+    } finally {
+      setSavingRowId("");
+    }
+  };
 
   const downloadStatement = () => {
     if (!selectedGroup || !cycleMonth || !statementData) {
@@ -274,11 +356,11 @@ const StatementBuilder = () => {
       <div className="section-heading">
         <div>
           <p className="section-label">Statements</p>
-          <h2>Generate Monthly Statement</h2>
+          <h2>View, Edit, and Download Statement</h2>
         </div>
         <p className="section-note">
-          Pick a group and month, prepare the sheet-style summary, and download
-          it as a PDF.
+          Pick a group and month, update member payment entries inline, and
+          download the final statement as a PDF.
         </p>
       </div>
 
@@ -312,8 +394,8 @@ const StatementBuilder = () => {
           Download statement PDF
         </button>
         <span className="action-hint">
-          Use this after collections and release details are entered for the
-          month.
+          This page can be used as the month-wise collection sheet. Updates here
+          write to the payments table.
         </span>
       </div>
 
@@ -376,24 +458,147 @@ const StatementBuilder = () => {
                   <th>Balance</th>
                   <th>Status</th>
                   <th>Paid On</th>
+                  <th>Mode</th>
+                  <th>Notes</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {statementData.rows.map((row) => (
-                  <tr key={`${row.memberName}-${row.paidOn}`}>
+                  <tr
+                    key={row.groupMemberId}
+                    className={
+                      editingRowId === row.groupMemberId ? "row-editing" : ""
+                    }
+                  >
                     <td>{row.memberName}</td>
                     <td>{row.shareCount}</td>
                     <td>{currencyFormatter.format(row.expectedAmount)}</td>
-                    <td>{currencyFormatter.format(row.paidAmount)}</td>
+                    <td>
+                      {editingRowId === row.groupMemberId ? (
+                        <input
+                          className="table-input"
+                          type="number"
+                          value={paymentForm.amount}
+                          onChange={(event) =>
+                            setPaymentForm((current) => ({
+                              ...current,
+                              amount: event.target.value,
+                            }))
+                          }
+                        />
+                      ) : (
+                        currencyFormatter.format(row.paidAmount)
+                      )}
+                    </td>
                     <td>{currencyFormatter.format(row.balanceAmount)}</td>
                     <td>
-                      <span
-                        className={`status-pill ${String(row.paymentStatus).toLowerCase()}`}
-                      >
-                        {row.paymentStatus}
-                      </span>
+                      {editingRowId === row.groupMemberId ? (
+                        <select
+                          className="table-select"
+                          value={paymentForm.status}
+                          onChange={(event) =>
+                            setPaymentForm((current) => ({
+                              ...current,
+                              status: event.target.value,
+                            }))
+                          }
+                        >
+                          <option value="Paid">Paid</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Partial">Partial</option>
+                        </select>
+                      ) : (
+                        <span
+                          className={`status-pill ${String(row.paymentStatus).toLowerCase()}`}
+                        >
+                          {row.paymentStatus}
+                        </span>
+                      )}
                     </td>
-                    <td>{row.paidOn}</td>
+                    <td>
+                      {editingRowId === row.groupMemberId ? (
+                        <input
+                          className="table-input"
+                          type="date"
+                          value={paymentForm.paidOn}
+                          onChange={(event) =>
+                            setPaymentForm((current) => ({
+                              ...current,
+                              paidOn: event.target.value,
+                            }))
+                          }
+                        />
+                      ) : (
+                        row.paidOn || "-"
+                      )}
+                    </td>
+                    <td>
+                      {editingRowId === row.groupMemberId ? (
+                        <select
+                          className="table-select"
+                          value={paymentForm.paymentMode}
+                          onChange={(event) =>
+                            setPaymentForm((current) => ({
+                              ...current,
+                              paymentMode: event.target.value,
+                            }))
+                          }
+                        >
+                          <option value="Cash">Cash</option>
+                          <option value="UPI">UPI</option>
+                          <option value="Bank Transfer">Bank Transfer</option>
+                          <option value="Cheque">Cheque</option>
+                        </select>
+                      ) : (
+                        row.paymentMode || "-"
+                      )}
+                    </td>
+                    <td>
+                      {editingRowId === row.groupMemberId ? (
+                        <input
+                          className="table-input"
+                          value={paymentForm.notes}
+                          onChange={(event) =>
+                            setPaymentForm((current) => ({
+                              ...current,
+                              notes: event.target.value,
+                            }))
+                          }
+                          placeholder="Receipt or remarks"
+                        />
+                      ) : (
+                        row.notes || "-"
+                      )}
+                    </td>
+                    <td>
+                      {editingRowId === row.groupMemberId ? (
+                        <div className="row-actions">
+                          <button
+                            className="primary-button compact-button"
+                            onClick={() => savePaymentRow(row)}
+                            disabled={savingRowId === row.groupMemberId}
+                          >
+                            {savingRowId === row.groupMemberId
+                              ? "Saving..."
+                              : "Save"}
+                          </button>
+                          <button
+                            className="ghost-button compact-button"
+                            onClick={cancelEditingRow}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className="ghost-button compact-button"
+                          onClick={() => startEditingRow(row)}
+                        >
+                          {row.paymentId ? "Edit" : "Add"}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -409,4 +614,4 @@ const StatementBuilder = () => {
   );
 };
 
-export default StatementBuilder;
+export default MonthlyCollectionStatementBuilder;

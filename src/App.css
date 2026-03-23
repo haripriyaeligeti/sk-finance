@@ -361,6 +361,38 @@
   overflow-x: auto;
 }
 
+.table-input,
+.table-select {
+  width: 100%;
+  min-width: 110px;
+  border: 1px solid #dbc8bc;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  background: rgba(255, 255, 255, 0.96);
+  color: #20150f;
+}
+
+.table-input:focus,
+.table-select:focus {
+  outline: 2px solid rgba(140, 63, 44, 0.18);
+  border-color: #8c3f2c;
+}
+
+.row-editing {
+  background: rgba(140, 63, 44, 0.05);
+}
+
+.row-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.compact-button {
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

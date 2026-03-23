@@ -3,10 +3,10 @@ import "./App.css";
 import Dashboard from "./components/Dashboard";
 import GroupMembersTable from "./components/GroupMembersTable";
 import Groups from "./components/Groups";
+import MonthlyCollectionStatementBuilder from "./components/MonthlyCollectionStatementBuilder";
 import PaymentsTable from "./components/PaymentsTable";
 import PeopleTable from "./components/PeopleTable";
 import ReleasesTable from "./components/ReleasesTable";
-import StatementBuilder from "./components/StatementBuilder";
 
 const pageItems = [
   {
@@ -52,10 +52,10 @@ const pageItems = [
   },
   {
     id: "statements",
-    label: "Download / View Statement",
-    title: "Download / View Statement",
+    label: "Monthly Collecetion Statements",
+    title: "View / Edit / Download Monthly Collecetion Statement",
     description:
-      "Preview the month-end statement and download it as a PDF for the selected group and cycle.",
+      "Use one month-wise sheet to review members, update payment details inline, and download the final statement PDF.",
   },
 ];
 
@@ -78,7 +78,7 @@ function App() {
       case "releases":
         return <ReleasesTable />;
       case "statements":
-        return <StatementBuilder />;
+        return <MonthlyCollectionStatementBuilder />;
       case "home":
       default:
         return (
