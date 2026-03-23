@@ -79,7 +79,15 @@ const GroupMembersTable = () => {
     fetchGroupMembers();
   };
 
-  const deleteGroupMember = async (id) => {
+  const deleteGroupMember = async (id, memberName) => {
+    const shouldDelete = window.confirm(
+      `Are you sure you want to delete member ${memberName || ""} from this group?`.trim(),
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
     await deleteDoc(doc(db, "groupMembers", id));
     fetchGroupMembers();
   };
@@ -226,7 +234,12 @@ const GroupMembersTable = () => {
                 <td>
                   <button
                     className="ghost-button"
-                    onClick={() => deleteGroupMember(member.id)}
+                    onClick={() =>
+                      deleteGroupMember(
+                        member.id,
+                        member.memberName || member.personId,
+                      )
+                    }
                   >
                     Delete
                   </button>

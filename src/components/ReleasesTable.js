@@ -101,7 +101,15 @@ const ReleasesTable = () => {
     fetchReleases();
   };
 
-  const deleteRelease = async (id) => {
+  const deleteRelease = async (id, memberName) => {
+    const shouldDelete = window.confirm(
+      `Are you sure you want to delete release record for ${memberName || "this member"}?`,
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
     await deleteDoc(doc(db, "releases", id));
     fetchReleases();
   };
@@ -218,7 +226,12 @@ const ReleasesTable = () => {
                 <td>
                   <button
                     className="ghost-button"
-                    onClick={() => deleteRelease(release.id)}
+                    onClick={() =>
+                      deleteRelease(
+                        release.id,
+                        release.memberName || release.personId,
+                      )
+                    }
                   >
                     Delete
                   </button>

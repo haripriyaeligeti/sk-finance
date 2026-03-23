@@ -95,7 +95,15 @@ const PaymentsTable = () => {
     fetchPayments();
   };
 
-  const deletePayment = async (id) => {
+  const deletePayment = async (id, memberName) => {
+    const shouldDelete = window.confirm(
+      `Are you sure you want to delete payment for ${memberName || "this member"}?`,
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
     await deleteDoc(doc(db, "payments", id));
     fetchPayments();
   };
@@ -250,7 +258,12 @@ const PaymentsTable = () => {
                 <td>
                   <button
                     className="ghost-button"
-                    onClick={() => deletePayment(payment.id)}
+                    onClick={() =>
+                      deletePayment(
+                        payment.id,
+                        payment.memberName || payment.personId,
+                      )
+                    }
                   >
                     Delete
                   </button>

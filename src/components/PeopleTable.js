@@ -99,7 +99,15 @@ const PeopleTable = () => {
     fetchPeople();
   };
 
-  const deletePerson = async (id) => {
+  const deletePerson = async (id, personName) => {
+    const shouldDelete = window.confirm(
+      `Are you sure you want to delete customer ${personName || ""}?`.trim(),
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
     await deleteDoc(doc(db, "people", id));
     if (editingPersonId === id) {
       resetForm();
@@ -186,7 +194,14 @@ const PeopleTable = () => {
                 <td>
                   <button
                     className="ghost-button"
-                    onClick={() => deletePerson(person.id)}
+                    onClick={() =>
+                      deletePerson(
+                        person.id,
+                        [person.firstName, person.lastName]
+                          .filter(Boolean)
+                          .join(" "),
+                      )
+                    }
                   >
                     Delete
                   </button>

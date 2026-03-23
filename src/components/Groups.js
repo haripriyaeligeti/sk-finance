@@ -149,7 +149,15 @@ const Groups = () => {
     fetchGroups();
   };
 
-  const deleteGroup = async (id) => {
+  const deleteGroup = async (id, groupName) => {
+    const shouldDelete = window.confirm(
+      `Are you sure you want to delete group ${groupName || ""}?`.trim(),
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
     await deleteDoc(doc(db, "groups", id));
     if (editingGroupId === id) {
       resetForm();
@@ -314,7 +322,7 @@ const Groups = () => {
                   <td>
                     <button
                       className="ghost-button"
-                      onClick={() => deleteGroup(group.id)}
+                      onClick={() => deleteGroup(group.id, group.groupName)}
                     >
                       Delete
                     </button>
