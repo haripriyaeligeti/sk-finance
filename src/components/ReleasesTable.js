@@ -9,12 +9,6 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 
-const currencyFormatter = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 0,
-});
-
 const ReleasesTable = () => {
   const [groups, setGroups] = useState([]);
   const [memberships, setMemberships] = useState([]);
@@ -22,7 +16,6 @@ const ReleasesTable = () => {
   const [groupId, setGroupId] = useState("");
   const [groupMemberId, setGroupMemberId] = useState("");
   const [cycleMonth, setCycleMonth] = useState("");
-  const [discountAmount, setDiscountAmount] = useState("");
   const [releasedOn, setReleasedOn] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -67,15 +60,6 @@ const ReleasesTable = () => {
       return;
     }
 
-    const potValue =
-      Number(selectedGroup.monthlyShare || 0) *
-      Number(selectedGroup.memberCapacity || 0);
-    const resolvedDiscountAmount = Number(discountAmount || 0);
-    const releasedAmount = Math.max(potValue - resolvedDiscountAmount, 0);
-    const dividendPerMember = selectedGroup.memberCapacity
-      ? resolvedDiscountAmount / Number(selectedGroup.memberCapacity)
-      : 0;
-
     await addDoc(collection(db, "releases"), {
       groupId,
       groupName: selectedGroup.groupName,
@@ -83,10 +67,6 @@ const ReleasesTable = () => {
       personId: selectedMembership.personId,
       memberName: selectedMembership.memberName,
       cycleMonth,
-      potValue,
-      discountAmount: resolvedDiscountAmount,
-      dividendPerMember,
-      releasedAmount,
       releasedOn,
       notes: notes.trim(),
       createdAt: Timestamp.now(),
@@ -95,7 +75,6 @@ const ReleasesTable = () => {
     setGroupId("");
     setGroupMemberId("");
     setCycleMonth("");
-    setDiscountAmount("");
     setReleasedOn("");
     setNotes("");
     fetchReleases();
@@ -118,13 +97,9 @@ const ReleasesTable = () => {
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="section-label">Auction</p>
-          <h2>Prize Releases</h2>
+          <h2>Releases</h2>
         </div>
-        <p className="section-note">
-          Track the winning member, discount, released amount, and dividend
-          distribution.
-        </p>
+        <p className="section-note">Track Released Members</p>
       </div>
 
       <div className="form-grid">
@@ -143,7 +118,7 @@ const ReleasesTable = () => {
           </select>
         </label>
         <label>
-          Prize winner
+          Group Member
           <select
             value={groupMemberId}
             onChange={(event) => setGroupMemberId(event.target.value)}
@@ -162,15 +137,6 @@ const ReleasesTable = () => {
             type="month"
             value={cycleMonth}
             onChange={(event) => setCycleMonth(event.target.value)}
-          />
-        </label>
-        <label>
-          Auction discount
-          <input
-            type="number"
-            value={discountAmount}
-            onChange={(event) => setDiscountAmount(event.target.value)}
-            placeholder="Enter discount amount"
           />
         </label>
         <label>
@@ -193,7 +159,7 @@ const ReleasesTable = () => {
 
       <div className="action-row">
         <button className="primary-button" onClick={addRelease}>
-          Record release
+          Add release
         </button>
       </div>
 
@@ -204,10 +170,7 @@ const ReleasesTable = () => {
               <th>Group</th>
               <th>Winner</th>
               <th>Cycle</th>
-              <th>Pot</th>
-              <th>Discount</th>
-              <th>Released</th>
-              <th>Dividend / Member</th>
+              <th>Released on</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -217,12 +180,7 @@ const ReleasesTable = () => {
                 <td>{release.groupName || release.groupId}</td>
                 <td>{release.memberName || release.personId}</td>
                 <td>{release.cycleMonth || "-"}</td>
-                <td>{currencyFormatter.format(release.potValue || 0)}</td>
-                <td>{currencyFormatter.format(release.discountAmount || 0)}</td>
-                <td>{currencyFormatter.format(release.releasedAmount || 0)}</td>
-                <td>
-                  {currencyFormatter.format(release.dividendPerMember || 0)}
-                </td>
+                <td>{release.releasedOn || "-"}</td>
                 <td>
                   <button
                     className="ghost-button"

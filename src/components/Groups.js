@@ -262,16 +262,12 @@ const Groups = () => {
               <th>Occupied Shares</th>
               <th>Duration</th>
               <th>Start</th>
-              <th>Pot Value</th>
               <th>Status</th>
               <th>Action</th>
             </tr>
           </thead>
           <tbody>
             {groups.map((group) => {
-              const potValue =
-                Number(group.monthlyShare || 0) *
-                Number(group.memberCapacity || 0);
               const occupiedShares = groupMembers
                 .filter((member) => member.groupId === group.id)
                 .reduce(
@@ -311,7 +307,6 @@ const Groups = () => {
                   </td>
                   <td>{group.durationMonths || "-"}</td>
                   <td>{group.startMonth || "-"}</td>
-                  <td>{currencyFormatter.format(potValue)}</td>
                   <td>
                     <span
                       className={`status-pill ${String(group.status || "").toLowerCase()}`}
