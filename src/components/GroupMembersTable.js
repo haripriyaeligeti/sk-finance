@@ -142,6 +142,8 @@ const GroupMembersTable = () => {
     return matchesGroup && matchesCustomer;
   });
 
+  const groupMap = new Map(groups.map((group) => [group.id, group]));
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -253,7 +255,11 @@ const GroupMembersTable = () => {
           <tbody>
             {visibleGroupMembers.map((member) => (
               <tr key={member.id}>
-                <td>{member.groupName || member.groupId}</td>
+                <td>
+                  {groupMap.get(member.groupId)?.groupName ||
+                    member.groupName ||
+                    member.groupId}
+                </td>
                 <td>
                   {(
                     memberLabelsById.get(member.id) || [
@@ -263,9 +269,10 @@ const GroupMembersTable = () => {
                 </td>
                 <td>{member.shareCount || 1}</td>
                 <td>
-                  {Number(member.monthlyContribution || 0).toLocaleString(
-                    "en-IN",
-                  )}
+                  {(
+                    Number(groupMap.get(member.groupId)?.monthlyShare || 0) *
+                    Math.max(Number(member.shareCount || 1), 1)
+                  ).toLocaleString("en-IN")}
                 </td>
                 <td>
                   {member.joinedAt

@@ -108,6 +108,9 @@ const Groups = () => {
 
   const updateGroupDetails = async () => {
     const trimmedName = groupName.trim();
+    const resolvedMonthlyShare = Number(monthlyShare);
+    const resolvedMemberCapacity = Number(memberCapacity);
+    const resolvedDurationMonths = Number(durationMonths);
 
     if (
       !editingGroupId ||
@@ -138,12 +141,26 @@ const Groups = () => {
     await updateDoc(doc(db, "groups", editingGroupId), {
       groupName: trimmedName,
       normalizedGroupName: trimmedName.toLowerCase(),
-      monthlyShare: Number(monthlyShare),
-      memberCapacity: Number(memberCapacity),
-      durationMonths: Number(durationMonths),
+      monthlyShare: resolvedMonthlyShare,
+      memberCapacity: resolvedMemberCapacity,
+      durationMonths: resolvedDurationMonths,
       startMonth,
       status,
     });
+
+    const relatedMembers = groupMembers.filter(
+      (member) => member.groupId === editingGroupId,
+    );
+
+    await Promise.all(
+      relatedMembers.map((member) =>
+        updateDoc(doc(db, "groupMembers", member.id), {
+          groupName: trimmedName,
+          monthlyContribution:
+            resolvedMonthlyShare * Math.max(Number(member.shareCount || 1), 1),
+        }),
+      ),
+    );
 
     resetForm();
     fetchGroups();

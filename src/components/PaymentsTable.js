@@ -54,6 +54,8 @@ const PaymentsTable = () => {
     fetchPayments();
   }, []);
 
+  const groupMap = new Map(groups.map((group) => [group.id, group]));
+
   const filteredMemberships = memberships.filter(
     (membership) => membership.groupId === groupId,
   );
@@ -149,7 +151,11 @@ const PaymentsTable = () => {
               setGroupMemberId(nextMembershipId);
               setAmount(
                 nextMembership
-                  ? String(nextMembership.monthlyContribution || "")
+                  ? String(
+                      Number(
+                        groupMap.get(nextMembership.groupId)?.monthlyShare || 0,
+                      ) * Math.max(Number(nextMembership.shareCount || 1), 1),
+                    )
                   : "",
               );
             }}
