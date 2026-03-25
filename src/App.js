@@ -37,13 +37,13 @@ const pageItems = [
     description:
       "Enroll customers into groups and manage their share count and monthly commitments.",
   },
-  {
-    id: "payments",
-    label: "Monthly Payments",
-    title: "Monthly Payments",
-    description:
-      "Capture month-wise collections and payment status for each enrolled member.",
-  },
+  // {
+  //   id: "payments",
+  //   label: "Monthly Payments",
+  //   title: "Monthly Payments",
+  //   description:
+  //     "Capture month-wise collections and payment status for each enrolled member.",
+  // },
   {
     id: "releases",
     label: "Releases",
@@ -73,8 +73,8 @@ function App() {
         return <PeopleTable />;
       case "members":
         return <GroupMembersTable />;
-      case "payments":
-        return <PaymentsTable />;
+      // case "payments":
+      //   return <PaymentsTable />;
       case "releases":
         return <ReleasesTable />;
       case "statements":
