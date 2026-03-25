@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   collection,
   getDocs,
@@ -95,6 +95,41 @@ const GroupMembersTable = () => {
   useEffect(() => {
     fetchGroupMembers();
   }, []);
+
+  const memberLabelsById = useMemo(() => {
+    const totalsByGroupAndName = new Map();
+
+    groupMembers.forEach((member) => {
+      const baseName = member.memberName || member.personId || "Member";
+      const key = `${member.groupId}::${baseName}`;
+      totalsByGroupAndName.set(
+        key,
+        (totalsByGroupAndName.get(key) || 0) +
+          Math.max(Number(member.shareCount || 1), 1),
+      );
+    });
+
+    const sequenceByGroupAndName = new Map();
+    const labelMap = new Map();
+
+    groupMembers.forEach((member) => {
+      const baseName = member.memberName || member.personId || "Member";
+      const key = `${member.groupId}::${baseName}`;
+      const totalCount = totalsByGroupAndName.get(key) || 1;
+      const shareCount = Math.max(Number(member.shareCount || 1), 1);
+      const labels = [];
+
+      for (let index = 0; index < shareCount; index += 1) {
+        const nextSequence = (sequenceByGroupAndName.get(key) || 0) + 1;
+        sequenceByGroupAndName.set(key, nextSequence);
+        labels.push(totalCount > 1 ? `${baseName}-${nextSequence}` : baseName);
+      }
+
+      labelMap.set(member.id, labels);
+    });
+
+    return labelMap;
+  }, [groupMembers]);
 
   const visibleGroupMembers = groupMembers.filter((member) => {
     const matchesGroup = selectedGroupFilter
@@ -219,7 +254,13 @@ const GroupMembersTable = () => {
             {visibleGroupMembers.map((member) => (
               <tr key={member.id}>
                 <td>{member.groupName || member.groupId}</td>
-                <td>{member.memberName || member.personId}</td>
+                <td>
+                  {(
+                    memberLabelsById.get(member.id) || [
+                      member.memberName || member.personId,
+                    ]
+                  ).join(", ")}
+                </td>
                 <td>{member.shareCount || 1}</td>
                 <td>
                   {Number(member.monthlyContribution || 0).toLocaleString(
@@ -237,7 +278,11 @@ const GroupMembersTable = () => {
                     onClick={() =>
                       deleteGroupMember(
                         member.id,
-                        member.memberName || member.personId,
+                        (
+                          memberLabelsById.get(member.id) || [
+                            member.memberName || member.personId,
+                          ]
+                        ).join(", "),
                       )
                     }
                   >

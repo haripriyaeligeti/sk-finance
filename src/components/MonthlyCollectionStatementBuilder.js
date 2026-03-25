@@ -84,38 +84,80 @@ const MonthlyCollectionStatementBuilder = () => {
     const groupMemberships = memberships.filter(
       (membership) => membership.groupId === groupId,
     );
+    const cyclePayments = payments.filter(
+      (payment) =>
+        payment.groupId === groupId && payment.cycleMonth === cycleMonth,
+    );
     const paymentMap = new Map(
-      payments
-        .filter(
-          (payment) =>
-            payment.groupId === groupId && payment.cycleMonth === cycleMonth,
-        )
+      cyclePayments
+        .filter((payment) => payment.groupMemberShareKey)
+        .map((payment) => [payment.groupMemberShareKey, payment]),
+    );
+    const legacyPaymentMap = new Map(
+      cyclePayments
+        .filter((payment) => !payment.groupMemberShareKey)
         .map((payment) => [payment.groupMemberId, payment]),
     );
     const release =
       releases.find(
         (entry) => entry.groupId === groupId && entry.cycleMonth === cycleMonth,
       ) || null;
+    const totalsByMemberName = new Map();
 
-    const rows = groupMemberships.map((membership) => {
-      const payment = paymentMap.get(membership.id);
-      const expectedAmount = Number(membership.monthlyContribution || 0);
-      const paidAmount = Number(payment?.amount || 0);
+    groupMemberships.forEach((membership) => {
+      const baseMemberName = membership.memberName || membership.personId;
+      totalsByMemberName.set(
+        baseMemberName,
+        (totalsByMemberName.get(baseMemberName) || 0) +
+          Math.max(Number(membership.shareCount || 1), 1),
+      );
+    });
 
-      return {
-        groupMemberId: membership.id,
-        personId: membership.personId,
-        memberName: membership.memberName || membership.personId,
-        shareCount: Number(membership.shareCount || 1),
-        expectedAmount,
-        paidAmount,
-        balanceAmount: Math.max(expectedAmount - paidAmount, 0),
-        paymentId: payment?.id || "",
-        paymentStatus: payment?.status || "Pending",
-        paidOn: payment?.paidOn || "",
-        paymentMode: payment?.paymentMode || "Cash",
-        notes: payment?.notes || "",
-      };
+    const memberSequenceMap = new Map();
+
+    const rows = groupMemberships.flatMap((membership) => {
+      const shareCount = Math.max(Number(membership.shareCount || 1), 1);
+      const baseMemberName = membership.memberName || membership.personId;
+      const expectedAmount = Number(
+        selectedGroup.monthlyShare ||
+          Number(membership.monthlyContribution || 0) / shareCount ||
+          0,
+      );
+
+      return Array.from({ length: shareCount }, (_, index) => {
+        const shareIndex = index + 1;
+        const nextSequence = (memberSequenceMap.get(baseMemberName) || 0) + 1;
+        memberSequenceMap.set(baseMemberName, nextSequence);
+        const totalCount = totalsByMemberName.get(baseMemberName) || 1;
+
+        const groupMemberShareKey = `${membership.id}-${shareIndex}`;
+        const payment =
+          paymentMap.get(groupMemberShareKey) ||
+          (shareCount === 1 ? legacyPaymentMap.get(membership.id) : null);
+        const paidAmount = Number(payment?.amount || 0);
+
+        return {
+          rowId: groupMemberShareKey,
+          groupMemberId: membership.id,
+          groupMemberShareKey,
+          shareIndex,
+          personId: membership.personId,
+          baseMemberName,
+          memberName:
+            totalCount > 1
+              ? `${baseMemberName}-${nextSequence}`
+              : baseMemberName,
+          shareCount,
+          expectedAmount,
+          paidAmount,
+          balanceAmount: Math.max(expectedAmount - paidAmount, 0),
+          paymentId: payment?.id || "",
+          paymentStatus: payment?.status || "Pending",
+          paidOn: payment?.paidOn || "",
+          paymentMode: payment?.paymentMode || "Cash",
+          notes: payment?.notes || "",
+        };
+      });
     });
 
     const totalExpected = rows.reduce(
@@ -151,7 +193,7 @@ const MonthlyCollectionStatementBuilder = () => {
   }, [cycleMonth, groupId, memberships, payments, releases, selectedGroup]);
 
   const startEditingRow = (row) => {
-    setEditingRowId(row.groupMemberId);
+    setEditingRowId(row.rowId);
     setPaymentForm({
       amount: String(row.paidAmount || row.expectedAmount || ""),
       paidOn: row.paidOn || "",
@@ -180,15 +222,18 @@ const MonthlyCollectionStatementBuilder = () => {
 
     const resolvedAmount = Number(paymentForm.amount || 0);
 
-    setSavingRowId(row.groupMemberId);
+    setSavingRowId(row.rowId);
 
     try {
       const paymentPayload = {
         groupId,
         groupName: selectedGroup.groupName,
         groupMemberId: row.groupMemberId,
+        groupMemberShareKey: row.groupMemberShareKey,
+        shareIndex: row.shareIndex,
         personId: row.personId,
         memberName: row.memberName,
+        baseMemberName: row.baseMemberName,
         cycleMonth,
         amount: resolvedAmount,
         paidOn: paymentForm.paidOn,
@@ -263,8 +308,8 @@ const MonthlyCollectionStatementBuilder = () => {
           "Outstanding",
           currencyFormatter.format(statementData.totalOutstanding),
         ],
-        ["Paid Members", String(statementData.paidCount)],
-        ["Pending Members", String(statementData.pendingCount)],
+        ["Paid Shares", String(statementData.paidCount)],
+        ["Pending Shares", String(statementData.pendingCount)],
       ],
       theme: "grid",
       headStyles: { fillColor: [140, 63, 44] },
@@ -312,7 +357,7 @@ const MonthlyCollectionStatementBuilder = () => {
       head: [
         [
           "Member",
-          "Shares",
+          "Share",
           "Expected",
           "Collected",
           "Balance",
@@ -323,7 +368,7 @@ const MonthlyCollectionStatementBuilder = () => {
       ],
       body: statementData.rows.map((row) => [
         row.memberName,
-        row.shareCount,
+        row.shareIndex,
         currencyFormatter.format(row.expectedAmount),
         currencyFormatter.format(row.paidAmount),
         currencyFormatter.format(row.balanceAmount),
@@ -440,10 +485,10 @@ const MonthlyCollectionStatementBuilder = () => {
               <strong>Month:</strong> {cycleMonth}
             </p>
             <p>
-              <strong>Paid Members:</strong> {statementData.paidCount}
+              <strong>Paid Shares:</strong> {statementData.paidCount}
             </p>
             <p>
-              <strong>Pending Members:</strong> {statementData.pendingCount}
+              <strong>Pending Shares:</strong> {statementData.pendingCount}
             </p>
           </div>
 
@@ -452,7 +497,7 @@ const MonthlyCollectionStatementBuilder = () => {
               <thead>
                 <tr>
                   <th>Member</th>
-                  <th>Shares</th>
+                  <th>Share</th>
                   <th>Expected</th>
                   <th>Collected</th>
                   <th>Balance</th>
@@ -466,16 +511,14 @@ const MonthlyCollectionStatementBuilder = () => {
               <tbody>
                 {statementData.rows.map((row) => (
                   <tr
-                    key={row.groupMemberId}
-                    className={
-                      editingRowId === row.groupMemberId ? "row-editing" : ""
-                    }
+                    key={row.rowId}
+                    className={editingRowId === row.rowId ? "row-editing" : ""}
                   >
                     <td>{row.memberName}</td>
-                    <td>{row.shareCount}</td>
+                    <td>{row.shareIndex}</td>
                     <td>{currencyFormatter.format(row.expectedAmount)}</td>
                     <td>
-                      {editingRowId === row.groupMemberId ? (
+                      {editingRowId === row.rowId ? (
                         <input
                           className="table-input"
                           type="number"
@@ -493,7 +536,7 @@ const MonthlyCollectionStatementBuilder = () => {
                     </td>
                     <td>{currencyFormatter.format(row.balanceAmount)}</td>
                     <td>
-                      {editingRowId === row.groupMemberId ? (
+                      {editingRowId === row.rowId ? (
                         <select
                           className="table-select"
                           value={paymentForm.status}
@@ -517,7 +560,7 @@ const MonthlyCollectionStatementBuilder = () => {
                       )}
                     </td>
                     <td>
-                      {editingRowId === row.groupMemberId ? (
+                      {editingRowId === row.rowId ? (
                         <input
                           className="table-input"
                           type="date"
@@ -534,7 +577,7 @@ const MonthlyCollectionStatementBuilder = () => {
                       )}
                     </td>
                     <td>
-                      {editingRowId === row.groupMemberId ? (
+                      {editingRowId === row.rowId ? (
                         <select
                           className="table-select"
                           value={paymentForm.paymentMode}
@@ -555,7 +598,7 @@ const MonthlyCollectionStatementBuilder = () => {
                       )}
                     </td>
                     <td>
-                      {editingRowId === row.groupMemberId ? (
+                      {editingRowId === row.rowId ? (
                         <input
                           className="table-input"
                           value={paymentForm.notes}
@@ -572,16 +615,14 @@ const MonthlyCollectionStatementBuilder = () => {
                       )}
                     </td>
                     <td>
-                      {editingRowId === row.groupMemberId ? (
+                      {editingRowId === row.rowId ? (
                         <div className="row-actions">
                           <button
                             className="primary-button compact-button"
                             onClick={() => savePaymentRow(row)}
-                            disabled={savingRowId === row.groupMemberId}
+                            disabled={savingRowId === row.rowId}
                           >
-                            {savingRowId === row.groupMemberId
-                              ? "Saving..."
-                              : "Save"}
+                            {savingRowId === row.rowId ? "Saving..." : "Save"}
                           </button>
                           <button
                             className="ghost-button compact-button"
