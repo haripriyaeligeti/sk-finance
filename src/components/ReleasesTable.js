@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDoc,
   collection,
@@ -17,6 +17,7 @@ const ReleasesTable = () => {
   const [groupMemberId, setGroupMemberId] = useState("");
   const [shareIndex, setShareIndex] = useState("");
   const [cycleMonth, setCycleMonth] = useState("");
+  const cycleMonthInputRef = useRef(null);
   const [releasedOn, setReleasedOn] = useState("");
   const [nextCycleAmount, setNextCycleAmount] = useState("");
   const [notes, setNotes] = useState("");
@@ -150,6 +151,20 @@ const ReleasesTable = () => {
     fetchReleases();
   };
 
+  const openCycleMonthPicker = () => {
+    const input = cycleMonthInputRef.current;
+
+    if (!input || typeof input.showPicker !== "function") {
+      return;
+    }
+
+    try {
+      input.showPicker();
+    } catch {
+      // Some browsers restrict programmatic picker opening outside user gestures.
+    }
+  };
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -223,9 +238,12 @@ const ReleasesTable = () => {
         <label>
           Cycle month
           <input
+            ref={cycleMonthInputRef}
             type="month"
             value={cycleMonth}
             onChange={(event) => setCycleMonth(event.target.value)}
+            onClick={openCycleMonthPicker}
+            onFocus={openCycleMonthPicker}
           />
         </label>
         <label>

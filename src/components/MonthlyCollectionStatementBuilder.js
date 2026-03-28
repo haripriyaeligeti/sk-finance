@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDoc,
   collection,
@@ -17,6 +17,28 @@ const currencyFormatter = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 0,
 });
 
+const getRunningMonthNumber = (startMonth, cycleMonth) => {
+  if (!startMonth || !cycleMonth) {
+    return null;
+  }
+
+  const [startYear, startMonthIndex] = startMonth.split("-").map(Number);
+  const [cycleYear, cycleMonthIndex] = cycleMonth.split("-").map(Number);
+
+  if (!startYear || !startMonthIndex || !cycleYear || !cycleMonthIndex) {
+    return null;
+  }
+
+  const monthDifference =
+    (cycleYear - startYear) * 12 + (cycleMonthIndex - startMonthIndex);
+
+  if (monthDifference < 0) {
+    return null;
+  }
+
+  return monthDifference + 1;
+};
+
 const MonthlyCollectionStatementBuilder = () => {
   const [groups, setGroups] = useState([]);
   const [memberships, setMemberships] = useState([]);
@@ -25,6 +47,7 @@ const MonthlyCollectionStatementBuilder = () => {
   const [groupId, setGroupId] = useState("");
   const [cycleMonth, setCycleMonth] = useState("");
   const [editingRowId, setEditingRowId] = useState("");
+  const cycleMonthInputRef = useRef(null);
   const [paymentForm, setPaymentForm] = useState({
     amount: "",
     paidOn: "",
@@ -75,9 +98,15 @@ const MonthlyCollectionStatementBuilder = () => {
   }, []);
 
   const selectedGroup = groups.find((group) => group.id === groupId);
+  const runningMonthNumber = getRunningMonthNumber(
+    selectedGroup?.startMonth,
+    cycleMonth,
+  );
+  const isBeforeGroupStart =
+    Boolean(selectedGroup && cycleMonth) && runningMonthNumber === null;
 
   const statementData = useMemo(() => {
-    if (!selectedGroup || !cycleMonth) {
+    if (!selectedGroup || !cycleMonth || runningMonthNumber === null) {
       return null;
     }
 
@@ -218,7 +247,15 @@ const MonthlyCollectionStatementBuilder = () => {
       pendingCount,
       potValue,
     };
-  }, [cycleMonth, groupId, memberships, payments, releases, selectedGroup]);
+  }, [
+    cycleMonth,
+    groupId,
+    memberships,
+    payments,
+    releases,
+    runningMonthNumber,
+    selectedGroup,
+  ]);
 
   const startEditingRow = (row) => {
     setEditingRowId(row.rowId);
@@ -287,6 +324,11 @@ const MonthlyCollectionStatementBuilder = () => {
   };
 
   const downloadStatement = () => {
+    if (isBeforeGroupStart) {
+      alert("The selected cycle month is before the group's start month.");
+      return;
+    }
+
     if (!selectedGroup || !cycleMonth || !statementData) {
       alert("Select a group and cycle month to generate the statement.");
       return;
@@ -319,11 +361,22 @@ const MonthlyCollectionStatementBuilder = () => {
       320,
       124,
     );
+    document.text(
+      `Running Month: ${runningMonthNumber ? `${runningMonthNumber} / ${selectedGroup.durationMonths || "-"}` : "-"}`,
+      320,
+      140,
+    );
 
     autoTable(document, {
-      startY: 146,
+      startY: 162,
       head: [["Metric", "Value"]],
       body: [
+        [
+          "Running Month",
+          runningMonthNumber
+            ? `${runningMonthNumber} / ${selectedGroup.durationMonths || "-"}`
+            : "-",
+        ],
         [
           "Total Expected",
           currencyFormatter.format(statementData.totalExpected),
@@ -371,7 +424,7 @@ const MonthlyCollectionStatementBuilder = () => {
       : [["Release Status", "No release recorded for this cycle yet"]];
 
     autoTable(document, {
-      startY: 146,
+      startY: 162,
       margin: { left: 320, right: 40 },
       head: [["Release Summary", "Value"]],
       body: releaseRows,
@@ -427,6 +480,20 @@ const MonthlyCollectionStatementBuilder = () => {
     document.save(fileName);
   };
 
+  const openCycleMonthPicker = () => {
+    const input = cycleMonthInputRef.current;
+
+    if (!input || typeof input.showPicker !== "function") {
+      return;
+    }
+
+    try {
+      input.showPicker();
+    } catch {
+      // Some browsers restrict programmatic picker opening outside user gestures.
+    }
+  };
+
   return (
     <section className="panel statement-panel">
       <div className="section-heading">
@@ -458,9 +525,12 @@ const MonthlyCollectionStatementBuilder = () => {
         <label>
           Cycle month
           <input
+            ref={cycleMonthInputRef}
             type="month"
             value={cycleMonth}
             onChange={(event) => setCycleMonth(event.target.value)}
+            onClick={openCycleMonthPicker}
+            onFocus={openCycleMonthPicker}
           />
         </label>
       </div>
@@ -516,14 +586,16 @@ const MonthlyCollectionStatementBuilder = () => {
               <strong>Month:</strong> {cycleMonth}
             </p>
             <p>
-              <strong>Paid Shares:</strong> {statementData.paidCount}
+              <strong>Running Month:</strong>{" "}
+              {runningMonthNumber
+                ? `${runningMonthNumber} / ${selectedGroup.durationMonths || "-"}`
+                : "-"}
             </p>
             <p>
-              <strong>Pending Shares:</strong> {statementData.pendingCount}
+              <strong>Paid:</strong> {statementData.paidCount}
             </p>
             <p>
-              <strong>Released Date:</strong>{" "}
-              {statementData.release?.releasedOn || "Not recorded"}
+              <strong>Pending:</strong> {statementData.pendingCount}
             </p>
           </div>
 
@@ -685,7 +757,9 @@ const MonthlyCollectionStatementBuilder = () => {
         </div>
       ) : (
         <div className="empty-state">
-          Select a group and cycle month to preview the month-end statement.
+          {isBeforeGroupStart
+            ? `This group starts in ${selectedGroup.startMonth}. Select that month or a later cycle month to view the statement.`
+            : "Select a group and cycle month to preview the month-end statement."}
         </div>
       )}
     </section>

@@ -544,7 +544,8 @@ thead th {
   border: 1px dashed rgba(92, 63, 49, 0.28);
   border-radius: 18px;
   padding: 18px;
-  color: #6b5b53;
+  color: #f50707;
+  font-size: 30px;
   background: rgba(255, 255, 255, 0.55);
 }
 

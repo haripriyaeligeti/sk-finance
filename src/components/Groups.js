@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   collection,
   getDocs,
@@ -28,6 +28,7 @@ const Groups = () => {
   const [durationMonths, setDurationMonths] = useState("");
   const [startMonth, setStartMonth] = useState("");
   const [status, setStatus] = useState("Active");
+  const startMonthInputRef = useRef(null);
 
   const resetForm = () => {
     setEditingGroupId("");
@@ -186,6 +187,20 @@ const Groups = () => {
     fetchGroups();
   }, []);
 
+  const openStartMonthPicker = () => {
+    const input = startMonthInputRef.current;
+
+    if (!input || typeof input.showPicker !== "function") {
+      return;
+    }
+
+    try {
+      input.showPicker();
+    } catch {
+      // Some browsers restrict programmatic picker opening outside user gestures.
+    }
+  };
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -237,9 +252,12 @@ const Groups = () => {
         <label>
           Start month
           <input
+            ref={startMonthInputRef}
             type="month"
             value={startMonth}
             onChange={(event) => setStartMonth(event.target.value)}
+            onClick={openStartMonthPicker}
+            onFocus={openStartMonthPicker}
           />
         </label>
         <label>
