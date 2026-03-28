@@ -30,3 +30,7 @@ code {
 a {
   color: #8c3f2c;
 }
+
+.required {
+  color: #c0392b;
+}

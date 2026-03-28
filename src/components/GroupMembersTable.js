@@ -158,12 +158,14 @@ const GroupMembersTable = () => {
 
       <div className="form-grid">
         <label>
-          Group
+          <span className="field-label">
+            Group Name<span className="required">*</span>
+          </span>
           <select
             value={groupId}
             onChange={(event) => setGroupId(event.target.value)}
           >
-            <option value="">Select group</option>
+            <option value="">Select Group</option>
             {groups.map((group) => (
               <option key={group.id} value={group.id}>
                 {group.groupName}
@@ -172,12 +174,14 @@ const GroupMembersTable = () => {
           </select>
         </label>
         <label>
-          Customer
+          <span className="field-label">
+            Customer Name <span className="required">*</span>
+          </span>
           <select
             value={personId}
             onChange={(event) => setPersonId(event.target.value)}
           >
-            <option value="">Select customer</option>
+            <option value="">Select Customer</option>
             {people.map((person) => (
               <option key={person.id} value={person.id}>
                 {[person.firstName, person.lastName].filter(Boolean).join(" ")}

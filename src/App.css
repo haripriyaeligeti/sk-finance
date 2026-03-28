@@ -269,6 +269,12 @@
   color: #45362d;
 }
 
+.field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .full-width {
   grid-column: 1 / -1;
 }

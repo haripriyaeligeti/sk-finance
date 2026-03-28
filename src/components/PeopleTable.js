@@ -70,8 +70,8 @@ const PeopleTable = () => {
   };
 
   const updatePerson = async () => {
-    if (!editingPersonId || !firstName.trim() || !lastName.trim()) {
-      alert("Enter first name and last name.");
+    if (!editingPersonId || !firstName.trim()) {
+      alert("Enter first name");
       return;
     }
 
@@ -123,7 +123,7 @@ const PeopleTable = () => {
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="section-label">Master Data</p>
+          <p className="section-label">Customers Data</p>
           <h2>Customers</h2>
         </div>
         <p className="section-note">
@@ -133,7 +133,9 @@ const PeopleTable = () => {
 
       <div className="form-grid">
         <label>
-          First name
+          <span className="field-label">
+            First Name <span className="required">*</span>
+          </span>
           <input
             placeholder="Sai"
             value={firstName}
@@ -141,7 +143,7 @@ const PeopleTable = () => {
           />
         </label>
         <label>
-          Last name
+          <span className="field-label">Last Name</span>
           <input
             placeholder="Krishna"
             value={lastName}
