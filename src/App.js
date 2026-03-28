@@ -4,7 +4,7 @@ import Dashboard from "./components/Dashboard";
 import GroupMembersTable from "./components/GroupMembersTable";
 import Groups from "./components/Groups";
 import MonthlyCollectionStatementBuilder from "./components/MonthlyCollectionStatementBuilder";
-import PaymentsTable from "./components/PaymentsTable";
+// import PaymentsTable from "./components/PaymentsTable";
 import PeopleTable from "./components/PeopleTable";
 import ReleasesTable from "./components/ReleasesTable";
 

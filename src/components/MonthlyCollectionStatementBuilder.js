@@ -102,6 +102,28 @@ const MonthlyCollectionStatementBuilder = () => {
       releases.find(
         (entry) => entry.groupId === groupId && entry.cycleMonth === cycleMonth,
       ) || null;
+    const priorReleaseMap = new Map(
+      releases
+        .filter(
+          (entry) =>
+            entry.groupId === groupId &&
+            entry.groupMemberShareKey &&
+            entry.cycleMonth < cycleMonth,
+        )
+        .sort((left, right) => left.cycleMonth.localeCompare(right.cycleMonth))
+        .map((entry) => [entry.groupMemberShareKey, entry]),
+    );
+    const activeReleaseMap = new Map(
+      releases
+        .filter(
+          (entry) =>
+            entry.groupId === groupId &&
+            entry.groupMemberShareKey &&
+            entry.cycleMonth <= cycleMonth,
+        )
+        .sort((left, right) => left.cycleMonth.localeCompare(right.cycleMonth))
+        .map((entry) => [entry.groupMemberShareKey, entry]),
+    );
     const totalsByMemberName = new Map();
 
     groupMemberships.forEach((membership) => {
@@ -134,6 +156,11 @@ const MonthlyCollectionStatementBuilder = () => {
         const payment =
           paymentMap.get(groupMemberShareKey) ||
           (shareCount === 1 ? legacyPaymentMap.get(membership.id) : null);
+        const priorRelease = priorReleaseMap.get(groupMemberShareKey);
+        const activeRelease = activeReleaseMap.get(groupMemberShareKey);
+        const resolvedExpectedAmount = priorRelease
+          ? Number(priorRelease.nextCycleAmount || expectedAmount)
+          : expectedAmount;
         const paidAmount = Number(payment?.amount || 0);
 
         return {
@@ -148,13 +175,14 @@ const MonthlyCollectionStatementBuilder = () => {
               ? `${baseMemberName}-${nextSequence}`
               : baseMemberName,
           shareCount,
-          expectedAmount,
+          expectedAmount: resolvedExpectedAmount,
           paidAmount,
-          balanceAmount: Math.max(expectedAmount - paidAmount, 0),
+          balanceAmount: Math.max(resolvedExpectedAmount - paidAmount, 0),
           paymentId: payment?.id || "",
           paymentStatus: payment?.status || "Pending",
           paidOn: payment?.paidOn || "",
           paymentMode: payment?.paymentMode || "Cash",
+          releasedOn: activeRelease?.releasedOn || "",
           notes: payment?.notes || "",
         };
       });
@@ -324,6 +352,7 @@ const MonthlyCollectionStatementBuilder = () => {
     const releaseRows = statementData.release
       ? [
           ["Winner", statementData.release.memberName || "-"],
+          ["Released On", statementData.release.releasedOn || "-"],
           [
             "Discount",
             currencyFormatter.format(statementData.release.discountAmount || 0),
@@ -362,6 +391,7 @@ const MonthlyCollectionStatementBuilder = () => {
           "Collected",
           "Balance",
           "Status",
+          "Released Date",
           "Paid On",
           "Mode",
         ],
@@ -373,6 +403,7 @@ const MonthlyCollectionStatementBuilder = () => {
         currencyFormatter.format(row.paidAmount),
         currencyFormatter.format(row.balanceAmount),
         row.paymentStatus,
+        row.releasedOn || "-",
         row.paidOn,
         row.paymentMode,
       ]),
@@ -490,6 +521,10 @@ const MonthlyCollectionStatementBuilder = () => {
             <p>
               <strong>Pending Shares:</strong> {statementData.pendingCount}
             </p>
+            <p>
+              <strong>Released Date:</strong>{" "}
+              {statementData.release?.releasedOn || "Not recorded"}
+            </p>
           </div>
 
           <div className="table-wrap">
@@ -502,6 +537,7 @@ const MonthlyCollectionStatementBuilder = () => {
                   <th>Collected</th>
                   <th>Balance</th>
                   <th>Status</th>
+                  <th>Released Date</th>
                   <th>Paid On</th>
                   <th>Mode</th>
                   <th>Notes</th>
@@ -559,6 +595,7 @@ const MonthlyCollectionStatementBuilder = () => {
                         </span>
                       )}
                     </td>
+                    <td>{row.releasedOn || "-"}</td>
                     <td>
                       {editingRowId === row.rowId ? (
                         <input
