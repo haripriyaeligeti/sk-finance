@@ -52,10 +52,10 @@ const pageItems = [
   },
   {
     id: "statements",
-    label: "Monthly Collecetion Statements",
-    title: "View / Edit / Download Monthly Collecetion Statement",
+    label: "Monthly Collection Sheet",
+    title: "View / Edit Monthly Collection Sheet",
     description:
-      "Use one month-wise sheet to review members, update payment details inline, and download the final statement PDF.",
+      "Use one month-wise sheet to review members, update payment details inline, and download the statement PDF.",
   },
 ];
 
