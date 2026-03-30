@@ -278,6 +278,12 @@ const MonthlyCollectionStatementBuilder = () => {
               </strong>
             </article>
             <article className="preview-card">
+              <span>Collected Amount</span>
+              <strong>
+                {currencyFormatter.format(statementData.totalCollected)}
+              </strong>
+            </article>
+            <article className="preview-card">
               <span>Pending Amount</span>
               <strong>
                 {currencyFormatter.format(statementData.totalOutstanding)}
