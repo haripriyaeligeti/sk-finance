@@ -6,8 +6,12 @@ import {
   deleteDoc,
   doc,
   Timestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import useTablePagination from "../utils/useTablePagination";
+
+const GROUP_MEMBERS_PAGE_SIZE = 10;
 
 const GroupMembersTable = () => {
   const [groupMembers, setGroupMembers] = useState([]);
@@ -18,6 +22,14 @@ const GroupMembersTable = () => {
   const [shareCount, setShareCount] = useState("1");
   const [selectedGroupFilter, setSelectedGroupFilter] = useState("");
   const [selectedCustomerFilter, setSelectedCustomerFilter] = useState("");
+  const [editingGroupMemberId, setEditingGroupMemberId] = useState("");
+
+  const resetForm = () => {
+    setEditingGroupMemberId("");
+    setGroupId("");
+    setPersonId("");
+    setShareCount("1");
+  };
 
   const fetchGroupMembers = async () => {
     const [membershipSnapshot, groupsSnapshot, peopleSnapshot] =
@@ -73,9 +85,53 @@ const GroupMembersTable = () => {
       monthlyContribution,
       joinedAt: Timestamp.now(),
     });
-    setGroupId("");
-    setPersonId("");
-    setShareCount("1");
+    resetForm();
+    fetchGroupMembers();
+  };
+
+  const startEditingGroupMember = (member) => {
+    setEditingGroupMemberId(member.id);
+    setGroupId(member.groupId || "");
+    setPersonId(member.personId || "");
+    setShareCount(String(member.shareCount || 1));
+  };
+
+  const updateGroupMember = async () => {
+    const selectedGroup = groups.find((group) => group.id === groupId);
+    const selectedPerson = people.find((person) => person.id === personId);
+
+    if (!editingGroupMemberId || !selectedGroup || !selectedPerson) {
+      alert("Select a valid group and customer.");
+      return;
+    }
+
+    const duplicateMember = groupMembers.some(
+      (member) =>
+        member.groupId === groupId &&
+        member.personId === personId &&
+        member.id !== editingGroupMemberId,
+    );
+
+    if (duplicateMember) {
+      alert("This customer is already enrolled in the selected group.");
+      return;
+    }
+
+    const resolvedShareCount = Math.max(Number(shareCount || 1), 1);
+
+    await updateDoc(doc(db, "groupMembers", editingGroupMemberId), {
+      groupId,
+      personId,
+      groupName: selectedGroup.groupName,
+      memberName: [selectedPerson.firstName, selectedPerson.lastName]
+        .filter(Boolean)
+        .join(" "),
+      shareCount: resolvedShareCount,
+      monthlyContribution:
+        Number(selectedGroup.monthlyShare || 0) * resolvedShareCount,
+    });
+
+    resetForm();
     fetchGroupMembers();
   };
 
@@ -89,6 +145,9 @@ const GroupMembersTable = () => {
     }
 
     await deleteDoc(doc(db, "groupMembers", id));
+    if (editingGroupMemberId === id) {
+      resetForm();
+    }
     fetchGroupMembers();
   };
 
@@ -141,6 +200,18 @@ const GroupMembersTable = () => {
 
     return matchesGroup && matchesCustomer;
   });
+
+  const {
+    totalPages,
+    currentPageSafe,
+    pageStart,
+    pageEnd,
+    paginatedItems: paginatedGroupMembers,
+    setCurrentPage,
+  } = useTablePagination(visibleGroupMembers, GROUP_MEMBERS_PAGE_SIZE, [
+    selectedGroupFilter,
+    selectedCustomerFilter,
+  ]);
 
   const groupMap = new Map(groups.map((group) => [group.id, group]));
 
@@ -201,9 +272,17 @@ const GroupMembersTable = () => {
       </div>
 
       <div className="action-row">
-        <button className="primary-button" onClick={addGroupMember}>
-          Enroll member
+        <button
+          className="primary-button"
+          onClick={editingGroupMemberId ? updateGroupMember : addGroupMember}
+        >
+          {editingGroupMemberId ? "Update member" : "Enroll member"}
         </button>
+        {editingGroupMemberId ? (
+          <button className="ghost-button" onClick={resetForm}>
+            Cancel
+          </button>
+        ) : null}
       </div>
 
       <div className="table-wrap">
@@ -257,7 +336,7 @@ const GroupMembersTable = () => {
             </tr>
           </thead>
           <tbody>
-            {visibleGroupMembers.map((member) => (
+            {paginatedGroupMembers.map((member) => (
               <tr key={member.id}>
                 <td>
                   {groupMap.get(member.groupId)?.groupName ||
@@ -284,25 +363,33 @@ const GroupMembersTable = () => {
                     : "-"}
                 </td>
                 <td>
-                  <button
-                    className="ghost-button"
-                    onClick={() =>
-                      deleteGroupMember(
-                        member.id,
-                        (
-                          memberLabelsById.get(member.id) || [
-                            member.memberName || member.personId,
-                          ]
-                        ).join(", "),
-                      )
-                    }
-                  >
-                    Delete
-                  </button>
+                  <div className="row-actions">
+                    <button
+                      className="ghost-button"
+                      onClick={() => startEditingGroupMember(member)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="ghost-button"
+                      onClick={() =>
+                        deleteGroupMember(
+                          member.id,
+                          (
+                            memberLabelsById.get(member.id) || [
+                              member.memberName || member.personId,
+                            ]
+                          ).join(", "),
+                        )
+                      }
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
-            {!visibleGroupMembers.length ? (
+            {!paginatedGroupMembers.length ? (
               <tr>
                 <td colSpan="6">
                   No group members found for the selected filter.
@@ -311,6 +398,34 @@ const GroupMembersTable = () => {
             ) : null}
           </tbody>
         </table>
+      </div>
+
+      <div className="table-pagination">
+        <p className="table-pagination-note">
+          Showing {pageStart}-{pageEnd} of {visibleGroupMembers.length} group
+          members
+        </p>
+        <div className="table-pagination-actions">
+          <button
+            className="ghost-button compact-button"
+            onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+            disabled={currentPageSafe === 1}
+          >
+            Previous
+          </button>
+          <span className="table-pagination-page">
+            Page {currentPageSafe} of {totalPages}
+          </span>
+          <button
+            className="ghost-button compact-button"
+            onClick={() =>
+              setCurrentPage((page) => Math.min(page + 1, totalPages))
+            }
+            disabled={currentPageSafe === totalPages}
+          >
+            Next
+          </button>
+        </div>
       </div>
     </section>
   );

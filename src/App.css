@@ -470,6 +470,32 @@ thead th {
   border-color: #8c3f2c;
 }
 
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.table-pagination-note,
+.table-pagination-page {
+  margin: 0;
+  color: #6b5b53;
+  font-size: 0.92rem;
+}
+
+.table-pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.table-pagination-actions .ghost-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -606,6 +632,12 @@ thead th {
   }
 
   .action-row-split {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .table-pagination,
+  .table-pagination-actions {
     flex-direction: column;
     align-items: flex-start;
   }

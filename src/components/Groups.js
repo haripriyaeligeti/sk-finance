@@ -11,12 +11,15 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import useTablePagination from "../utils/useTablePagination";
 
 const currencyFormatter = new Intl.NumberFormat("en-IN", {
   style: "currency",
   currency: "INR",
   maximumFractionDigits: 0,
 });
+
+const GROUPS_PAGE_SIZE = 10;
 
 const Groups = () => {
   const [groups, setGroups] = useState([]);
@@ -187,6 +190,15 @@ const Groups = () => {
     fetchGroups();
   }, []);
 
+  const {
+    totalPages,
+    currentPageSafe,
+    pageStart,
+    pageEnd,
+    paginatedItems: paginatedGroups,
+    setCurrentPage,
+  } = useTablePagination(groups, GROUPS_PAGE_SIZE);
+
   const openStartMonthPicker = () => {
     const input = startMonthInputRef.current;
 
@@ -302,7 +314,7 @@ const Groups = () => {
             </tr>
           </thead>
           <tbody>
-            {groups.map((group) => {
+            {paginatedGroups.map((group) => {
               const occupiedShares = groupMembers
                 .filter((member) => member.groupId === group.id)
                 .reduce(
@@ -360,8 +372,40 @@ const Groups = () => {
                 </tr>
               );
             })}
+            {!paginatedGroups.length ? (
+              <tr>
+                <td colSpan="8">No chit groups found.</td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
+      </div>
+
+      <div className="table-pagination">
+        <p className="table-pagination-note">
+          Showing {pageStart}-{pageEnd} of {groups.length} chit groups
+        </p>
+        <div className="table-pagination-actions">
+          <button
+            className="ghost-button compact-button"
+            onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+            disabled={currentPageSafe === 1}
+          >
+            Previous
+          </button>
+          <span className="table-pagination-page">
+            Page {currentPageSafe} of {totalPages}
+          </span>
+          <button
+            className="ghost-button compact-button"
+            onClick={() =>
+              setCurrentPage((page) => Math.min(page + 1, totalPages))
+            }
+            disabled={currentPageSafe === totalPages}
+          >
+            Next
+          </button>
+        </div>
       </div>
     </section>
   );

@@ -6,8 +6,12 @@ import {
   doc,
   getDocs,
   Timestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import useTablePagination from "../utils/useTablePagination";
+
+const RELEASES_PAGE_SIZE = 10;
 
 const ReleasesTable = () => {
   const [groups, setGroups] = useState([]);
@@ -21,6 +25,10 @@ const ReleasesTable = () => {
   const [releasedOn, setReleasedOn] = useState("");
   const [nextCycleAmount, setNextCycleAmount] = useState("");
   const [notes, setNotes] = useState("");
+  const [selectedReleaseGroupFilter, setSelectedReleaseGroupFilter] =
+    useState("");
+  const [releaseSearchQuery, setReleaseSearchQuery] = useState("");
+  const [editingReleaseId, setEditingReleaseId] = useState("");
 
   const fetchReleases = async () => {
     const [groupsSnapshot, membershipsSnapshot, releasesSnapshot] =
@@ -98,6 +106,56 @@ const ReleasesTable = () => {
   const selectedShareOptions =
     shareLabelsByMembershipId.get(groupMemberId) || [];
 
+  const resetForm = () => {
+    setEditingReleaseId("");
+    setGroupId("");
+    setGroupMemberId("");
+    setShareIndex("");
+    setCycleMonth("");
+    setReleasedOn("");
+    setNextCycleAmount("");
+    setNotes("");
+  };
+
+  const filteredReleases = useMemo(() => {
+    const normalizedQuery = releaseSearchQuery.trim().toLowerCase();
+
+    return releases.filter((release) => {
+      const matchesGroup = selectedReleaseGroupFilter
+        ? release.groupId === selectedReleaseGroupFilter
+        : true;
+      const matchesQuery = normalizedQuery
+        ? [
+            release.groupName,
+            release.groupId,
+            release.memberName,
+            release.personId,
+            release.cycleMonth,
+            release.releasedOn,
+            String(release.nextCycleAmount || ""),
+          ]
+            .filter(Boolean)
+            .some((value) =>
+              String(value).toLowerCase().includes(normalizedQuery),
+            )
+        : true;
+
+      return matchesGroup && matchesQuery;
+    });
+  }, [releases, selectedReleaseGroupFilter, releaseSearchQuery]);
+
+  const {
+    totalPages,
+    currentPageSafe,
+    pageStart,
+    pageEnd,
+    paginatedItems: paginatedReleases,
+    setCurrentPage,
+  } = useTablePagination(filteredReleases, RELEASES_PAGE_SIZE, [
+    selectedReleaseGroupFilter,
+    releaseSearchQuery,
+  ]);
+
   const addRelease = async () => {
     const selectedGroup = groups.find((group) => group.id === groupId);
     const selectedShare = selectedShareOptions.find(
@@ -128,13 +186,62 @@ const ReleasesTable = () => {
       createdAt: Timestamp.now(),
     });
 
-    setGroupId("");
-    setGroupMemberId("");
-    setShareIndex("");
-    setCycleMonth("");
-    setReleasedOn("");
-    setNextCycleAmount("");
-    setNotes("");
+    resetForm();
+    fetchReleases();
+  };
+
+  const startEditingRelease = (release) => {
+    setEditingReleaseId(release.id);
+    setGroupId(release.groupId || "");
+    setGroupMemberId(release.groupMemberId || "");
+    setShareIndex(
+      release.shareIndex === undefined ? "" : String(release.shareIndex),
+    );
+    setCycleMonth(release.cycleMonth || "");
+    setReleasedOn(release.releasedOn || "");
+    setNextCycleAmount(
+      release.nextCycleAmount === undefined
+        ? ""
+        : String(release.nextCycleAmount),
+    );
+    setNotes(release.notes || "");
+  };
+
+  const updateRelease = async () => {
+    const selectedGroup = groups.find((group) => group.id === groupId);
+    const selectedShare = selectedShareOptions.find(
+      (entry) => String(entry.shareIndex) === shareIndex,
+    );
+
+    if (!editingReleaseId || !selectedGroup || !selectedMembership) {
+      alert("Select a group and member.");
+      return;
+    }
+
+    if (!cycleMonth || !shareIndex) {
+      alert("Select a share and cycle month.");
+      return;
+    }
+
+    const resolvedNextCycleAmount = Number(
+      nextCycleAmount || selectedGroup.monthlyShare || 0,
+    );
+
+    await updateDoc(doc(db, "releases", editingReleaseId), {
+      groupId,
+      groupName: selectedGroup.groupName,
+      groupMemberId,
+      groupMemberShareKey: `${groupMemberId}-${shareIndex}`,
+      shareIndex: Number(shareIndex),
+      personId: selectedMembership.personId,
+      memberName: selectedShare?.label || selectedMembership.memberName,
+      cycleMonth,
+      releasedOn,
+      nextCycleAmount: resolvedNextCycleAmount,
+      notes: notes.trim(),
+    });
+
+    resetForm();
     fetchReleases();
   };
 
@@ -148,6 +255,9 @@ const ReleasesTable = () => {
     }
 
     await deleteDoc(doc(db, "releases", id));
+    if (editingReleaseId === id) {
+      resetForm();
+    }
     fetchReleases();
   };
 
@@ -274,17 +384,55 @@ const ReleasesTable = () => {
       </div>
 
       <div className="action-row">
-        <button className="primary-button" onClick={addRelease}>
-          Add release
+        <button
+          className="primary-button"
+          onClick={editingReleaseId ? updateRelease : addRelease}
+        >
+          {editingReleaseId ? "Update release" : "Add release"}
         </button>
+        {editingReleaseId ? (
+          <button className="ghost-button" onClick={resetForm}>
+            Cancel
+          </button>
+        ) : null}
       </div>
 
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Group</th>
-              <th>Winner</th>
+              <th>
+                <div className="table-header-filter">
+                  <span>Group</span>
+                  <select
+                    className="table-header-select"
+                    value={selectedReleaseGroupFilter}
+                    onChange={(event) =>
+                      setSelectedReleaseGroupFilter(event.target.value)
+                    }
+                  >
+                    <option value="">All groups</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.groupName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </th>
+              <th>
+                <div className="table-header-filter">
+                  <span>Customer Name</span>
+                  <input
+                    className="table-header-input"
+                    value={releaseSearchQuery}
+                    onChange={(event) =>
+                      setReleaseSearchQuery(event.target.value)
+                    }
+                    placeholder="Enter Customer Name"
+                  />
+                </div>
+              </th>
               <th>Next Cycle Amount</th>
               <th>Cycle</th>
               <th>Released on</th>
@@ -292,7 +440,7 @@ const ReleasesTable = () => {
             </tr>
           </thead>
           <tbody>
-            {releases.map((release) => (
+            {paginatedReleases.map((release) => (
               <tr key={release.id}>
                 <td>{release.groupName || release.groupId}</td>
                 <td>{release.memberName || release.personId}</td>
@@ -300,22 +448,62 @@ const ReleasesTable = () => {
                 <td>{release.cycleMonth || "-"}</td>
                 <td>{release.releasedOn || "-"}</td>
                 <td>
-                  <button
-                    className="ghost-button"
-                    onClick={() =>
-                      deleteRelease(
-                        release.id,
-                        release.memberName || release.personId,
-                      )
-                    }
-                  >
-                    Delete
-                  </button>
+                  <div className="row-actions">
+                    <button
+                      className="ghost-button"
+                      onClick={() => startEditingRelease(release)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="ghost-button"
+                      onClick={() =>
+                        deleteRelease(
+                          release.id,
+                          release.memberName || release.personId,
+                        )
+                      }
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
+            {!paginatedReleases.length ? (
+              <tr>
+                <td colSpan="6">No releases found for the selected filter.</td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
+      </div>
+
+      <div className="table-pagination">
+        <p className="table-pagination-note">
+          Showing {pageStart}-{pageEnd} of {filteredReleases.length} releases
+        </p>
+        <div className="table-pagination-actions">
+          <button
+            className="ghost-button compact-button"
+            onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+            disabled={currentPageSafe === 1}
+          >
+            Previous
+          </button>
+          <span className="table-pagination-page">
+            Page {currentPageSafe} of {totalPages}
+          </span>
+          <button
+            className="ghost-button compact-button"
+            onClick={() =>
+              setCurrentPage((page) => Math.min(page + 1, totalPages))
+            }
+            disabled={currentPageSafe === totalPages}
+          >
+            Next
+          </button>
+        </div>
       </div>
     </section>
   );

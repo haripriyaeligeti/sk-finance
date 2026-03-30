@@ -9,6 +9,9 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import useTablePagination from "../utils/useTablePagination";
+
+const PEOPLE_PAGE_SIZE = 10;
 
 const PeopleTable = () => {
   const [people, setPeople] = useState([]);
@@ -119,6 +122,15 @@ const PeopleTable = () => {
     fetchPeople();
   }, []);
 
+  const {
+    totalPages,
+    currentPageSafe,
+    pageStart,
+    pageEnd,
+    paginatedItems: paginatedPeople,
+    setCurrentPage,
+  } = useTablePagination(people, PEOPLE_PAGE_SIZE);
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -176,7 +188,7 @@ const PeopleTable = () => {
             </tr>
           </thead>
           <tbody>
-            {people.map((person) => (
+            {paginatedPeople.map((person) => (
               <tr key={person.id}>
                 <td>
                   <button
@@ -194,24 +206,64 @@ const PeopleTable = () => {
                     : "-"}
                 </td>
                 <td>
-                  <button
-                    className="ghost-button"
-                    onClick={() =>
-                      deletePerson(
-                        person.id,
-                        [person.firstName, person.lastName]
-                          .filter(Boolean)
-                          .join(" "),
-                      )
-                    }
-                  >
-                    Delete
-                  </button>
+                  <div className="row-actions">
+                    <button
+                      className="ghost-button"
+                      onClick={() => startEditingPerson(person)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="ghost-button"
+                      onClick={() =>
+                        deletePerson(
+                          person.id,
+                          [person.firstName, person.lastName]
+                            .filter(Boolean)
+                            .join(" "),
+                        )
+                      }
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
+            {!paginatedPeople.length ? (
+              <tr>
+                <td colSpan="3">No customers found.</td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
+      </div>
+
+      <div className="table-pagination">
+        <p className="table-pagination-note">
+          Showing {pageStart}-{pageEnd} of {people.length} customers
+        </p>
+        <div className="table-pagination-actions">
+          <button
+            className="ghost-button compact-button"
+            onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+            disabled={currentPageSafe === 1}
+          >
+            Previous
+          </button>
+          <span className="table-pagination-page">
+            Page {currentPageSafe} of {totalPages}
+          </span>
+          <button
+            className="ghost-button compact-button"
+            onClick={() =>
+              setCurrentPage((page) => Math.min(page + 1, totalPages))
+            }
+            disabled={currentPageSafe === totalPages}
+          >
+            Next
+          </button>
+        </div>
       </div>
     </section>
   );
